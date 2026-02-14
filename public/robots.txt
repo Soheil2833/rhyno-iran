@@ -1,0 +1,11 @@
+# *
+User-agent: *
+Allow: /
+Disallow: /api
+Disallow: /secret
+
+# Host
+Host: https://www.rhynoai.ir
+
+# Sitemaps
+Sitemap: https://www.rhynoai.ir/sitemap.xml
