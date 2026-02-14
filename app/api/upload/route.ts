@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+export const maxDuration = 300
+
+
 
 const s3Client = new S3Client({
   region: "ir-thr-at1", // ریجن دقیق شما طبق لینک
@@ -20,7 +23,7 @@ export async function POST(req: Request) {
     if (!file) return NextResponse.json({ error: "فایلی دریافت نشد" }, { status: 400 });
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    
+
     // پاک‌سازی نام فایل برای جلوگیری از ارورهای S3
     const extension = file.name.split('.').pop();
     const sanitizedName = file.name.split('.')[0]
@@ -39,10 +42,10 @@ export async function POST(req: Request) {
     };
 
     await s3Client.send(new PutObjectCommand(params));
-    
+
     // لینک مستقیم برای نمایش فایل
     const publicUrl = `https://rhyno.s3.ir-thr-at1.arvanstorage.ir/${fileName}`;
-    
+
     console.log(`[${requestId}] ✅ فایل در استوریج rhyno ذخیره شد`);
     return NextResponse.json({ url: publicUrl });
 

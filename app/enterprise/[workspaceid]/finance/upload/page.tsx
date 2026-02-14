@@ -30,6 +30,7 @@ import Image from "next/image"
 // ✅ ایمپورت کامپوننت رسید جدید (مسیر را چک کنید)
 import VoucherSuccessReceipt from "@/components/finance/VoucherSuccessReceipt"
 import { CustomerMappingUpload } from "@/components/CustomerMappingUpload"
+export const maxDuration = 300
 // --- تایپ‌ها ---
 type Transaction = {
   date: string
@@ -188,95 +189,95 @@ export default function ChatUploadPage() {
     return nameWithoutExt.replace(/[-_]/g, " ")
   }
 
-const autoSaveToDatabase = async (fileUrl: string, rawFileName: string) => {
-  const dynamicName = getCleanFileName(rawFileName);
-  
-  try {
-    await savePaymentRequestAction({
-      workspaceId,
-      fileUrl,
-      supplierName: dynamicName,
-      description: `آپلود از چت: ${rawFileName}`,
-      amount: 0,
-      status: "uploaded",
-      paymentDate: new Date().toISOString().split("T")[0],
-      type: "withdrawal"
+  const autoSaveToDatabase = async (fileUrl: string, rawFileName: string) => {
+    const dynamicName = getCleanFileName(rawFileName);
+
+    try {
+      await savePaymentRequestAction({
+        workspaceId,
+        fileUrl,
+        supplierName: dynamicName,
+        description: `آپلود از چت: ${rawFileName}`,
+        amount: 0,
+        status: "uploaded",
+        paymentDate: new Date().toISOString().split("T")[0],
+        type: "withdrawal"
+      });
+      console.log("✅ اطلاعات در دیتابیس آروان ذخیره شد");
+    } catch (error) {
+      console.error("❌ خطا در ذخیره دیتابیس:", error);
+      // لزوماً عملیات را متوقف نکنید تا کاربر بتواند آنالیز را ببیند
+    }
+  }
+  // این تابع را قبل از processImage تعریف کنید
+  const uploadViaServer = async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await fetch('/api/upload', {
+      method: 'POST',
+      body: formData,
     });
-    console.log("✅ اطلاعات در دیتابیس آروان ذخیره شد");
-  } catch (error) {
-    console.error("❌ خطا در ذخیره دیتابیس:", error);
-    // لزوماً عملیات را متوقف نکنید تا کاربر بتواند آنالیز را ببیند
-  }
-}
-// این تابع را قبل از processImage تعریف کنید
-const uploadViaServer = async (file: File) => {
-  const formData = new FormData();
-  formData.append('file', file);
 
-  const response = await fetch('/api/upload', {
-    method: 'POST',
-    body: formData,
-  });
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.error || "خطا در آپلود از طریق سرور");
+    }
 
-  if (!response.ok) {
-    const err = await response.json();
-    throw new Error(err.error || "خطا در آپلود از طریق سرور");
-  }
-
-  const data = await response.json();
-  return data.url; // بازگرداندن لینک نهایی
-};
-const processImage = async (file: File, msgId: string) => {
-  setMessages(prev =>
-    prev.map(m => m.id === msgId ? { ...m, status: "uploading", progress: 10 } : m)
-  );
-
-  try {
-    // ✅ تغییر: به جای آپلود مستقیم، از سرور خودمان استفاده می‌کنیم
-    const url = await uploadViaServer(file);
-
-    await autoSaveToDatabase(url, file.name);
-
+    const data = await response.json();
+    return data.url; // بازگرداندن لینک نهایی
+  };
+  const processImage = async (file: File, msgId: string) => {
     setMessages(prev =>
-      prev.map(m =>
-        m.id === msgId
-          ? { ...m, fileUrl: [url], progress: 100, status: "done" }
-          : m
-      )
+      prev.map(m => m.id === msgId ? { ...m, status: "uploading", progress: 10 } : m)
     );
-    setIsUploading(false);
-    startPageByPageAnalysis([url], []);
-  } catch (err: any) {
-    toast.error("خطا در آپلود: " + err.message);
-    setIsUploading(false);
-  }
-};
 
-const processPdf = async (file: File, msgId: string) => {
-  setMessages(prev =>
-    prev.map(m => (m.id === msgId ? { ...m, progress: 50, status: "uploading" } : m))
-  );
+    try {
+      // ✅ تغییر: به جای آپلود مستقیم، از سرور خودمان استفاده می‌کنیم
+      const url = await uploadViaServer(file);
 
-  try {
-    // ✅ تغییر: به جای آپلود مستقیم، از سرور خودمان استفاده می‌کنیم
-    const url = await uploadViaServer(file);
+      await autoSaveToDatabase(url, file.name);
 
-    await autoSaveToDatabase(url, file.name);
+      setMessages(prev =>
+        prev.map(m =>
+          m.id === msgId
+            ? { ...m, fileUrl: [url], progress: 100, status: "done" }
+            : m
+        )
+      );
+      setIsUploading(false);
+      startPageByPageAnalysis([url], []);
+    } catch (err: any) {
+      toast.error("خطا در آپلود: " + err.message);
+      setIsUploading(false);
+    }
+  };
 
+  const processPdf = async (file: File, msgId: string) => {
     setMessages(prev =>
-      prev.map(m =>
-        m.id === msgId
-          ? { ...m, fileUrl: [url], progress: 100, status: "done" }
-          : m
-      )
+      prev.map(m => (m.id === msgId ? { ...m, progress: 50, status: "uploading" } : m))
     );
-    setIsUploading(false);
-    startPageByPageAnalysis([url], [""]);
-  } catch (err: any) {
-    toast.error("خطا در آپلود PDF: " + err.message);
-    setIsUploading(false);
-  }
-};
+
+    try {
+      // ✅ تغییر: به جای آپلود مستقیم، از سرور خودمان استفاده می‌کنیم
+      const url = await uploadViaServer(file);
+
+      await autoSaveToDatabase(url, file.name);
+
+      setMessages(prev =>
+        prev.map(m =>
+          m.id === msgId
+            ? { ...m, fileUrl: [url], progress: 100, status: "done" }
+            : m
+        )
+      );
+      setIsUploading(false);
+      startPageByPageAnalysis([url], [""]);
+    } catch (err: any) {
+      toast.error("خطا در آپلود PDF: " + err.message);
+      setIsUploading(false);
+    }
+  };
   const startPageByPageAnalysis = async (urls: string[], texts: string[]) => {
     setIsAnalyzing(true)
     const analyzingMsgId = "analyzing-" + Date.now()
